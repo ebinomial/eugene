@@ -60,24 +60,19 @@ def setup_client(base_url: str, api_key: str = '') -> ModelClient | None:
         return None
 
 # Enenees gaduur yur ni ymr neg generation horiotoi kk.
-async def generate_message(client: ModelClient, 
-                           model: str, context: List[Dict[str, str]], 
-                           query: str) -> List[Dict[str, str]]:
+async def generate_message(client: ModelClient, model: str, 
+                           context: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
     Generates a query in the context of the interaction history from the stated model.
     Args:
         client (ModelClient): driver to the model host
         model (str): name of the model for use running on the host
         context (List[Dict[str, str]]): list of interactive roles and corresponding content text messages
-        query (str): the query asked by the user. It's optional in event of query inside the context.
     
     Returns:
         List[Dict[str, str]]: context affixed with the user query as well as the model response
     """
 
-    if query is not None:
-        context.append({ "role": "user", "content": query })
-    
     stream = await client.chat.completions.create(
         messages=context, 
         model=model, 
@@ -87,13 +82,13 @@ async def generate_message(client: ModelClient,
 
     full_response = str()
     
-    print(f">>>{query}\n>>>{model.upper()}: ", end="")
+    print(f">>>{model.upper()}: ", end="")
     async for token in stream:
         if token.choices[0].delta.content:
             print(token.choices[0].delta.content, end="")
             full_response += token.choices[0].delta.content
 
-    print("\n")
+    print("\n\n")
     return full_response
 
 if __name__ == '__main__':

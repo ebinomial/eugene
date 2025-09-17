@@ -22,8 +22,10 @@
 
 
 import os
+import re
 import sys
 import yaml
+import json
 import asyncio
 
 from dotenv import load_dotenv
@@ -60,6 +62,10 @@ class StdioClient:
     async def connect_to_server(self, cmd: str, args: List[str], env: Dict[str, str]) -> None:
         """
         Connect to MCP Server for Slack communication running on Standard I/O Transport.
+        Args:
+            cmd (str): Command to initiate the local MCP server instance
+            args (List[str]): The list of arguments needed to kick off cmd
+            env (Dict[str, str]): environment variables to configure the server behaviors
         """
 
         server_params = StdioServerParameters(command=cmd, args=args, env=env)
@@ -87,18 +93,57 @@ class StdioClient:
 
         self.system = Template(self.system).render({"tools": self.available_tools})
 
-    async def process_query(self, query: str) -> str:
+    async def handle_request(self, query: str) -> str:
+        """Handles the user request as a whole. If the query requests a simple response 
+        it returns the model output in plain text. In event of multi-step reasoning and tool use,
+        it acts as a ReAct agent that reasons over the current observations from the tools and decide
+        to return the final answer or proceed differently.
+        Args:
+            query (str): User query currently in absence of context
+
+        Returns:
+            str: model response or the final answer formulated through ReAct reasoning.
+        """
+
         messages = [
             { "role": "system", "content": self.system },
             { "role": "user", "content": query }
         ]
 
-        response = await generate_message(self.model_client, "egune", messages, None)
+        response = await generate_message(self.model_client, "egune", messages)
+
+
+        if (match := re.search(r"```json\s*(.*?)\s*```", response)) is not None:
+            tool_call = match.group(1)
+            try:
+                invocation_request = json.loads(tool_call)
+
+                if ("name" in invocation_request) and ("args" in invocation_request):
+                    
+                    tool_response = await self.session.call_tool(
+                        invocation_request["name"], 
+                        invocation_request["args"]
+                    )
+
+                    print(f"Tool response: {tool_response}")
+
+                else:
+                    print(f"tool invocation request generated/parsed incorrectly: {tool_call}")
+
+            except (ValueError, Exception) as e:
+                print(f"Error happened in parsing the invocation request..: {str(e)}")
+
+            sys.exit(0)
 
         return response
     
     async def initiate_cycle(self) -> None:
-        """Start the interaction cycle between a user and the MCP client."""
+        """
+        Sets off the ReAct agent cycle by receiving user queries indefinitely.
+        If user requests something that requires a series of actions and contemplating
+        actions, the request handling method encapsulates those steps according to queries.
+        In other words, the session to solve a single query is isolated in itself.
+        """
 
         while True:
             try:
@@ -108,7 +153,7 @@ class StdioClient:
                     print(f"Quitting the interaction cycle...")
                     sys.exit(0)
 
-                response = await self.process_query(query)
+                response = await self.handle_request(query)
                 print(f"Response: {response}\n")
             
             except Exception as e:
@@ -127,6 +172,7 @@ class StdioClient:
 async def main():
 
     client = StdioClient()
+
     try:
 
         cmd = "npx"
