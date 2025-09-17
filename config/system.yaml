@@ -1,0 +1,9 @@
+models:
+  egune:
+    prompt: "You are an AI bot capable of executing my commands on basis of tools provided to you further down.\n\nIn the following section, I will enumerate the tools you are permitted to use in attempt to carry out my requests.\n\n{%for tool in tools%}\nName : {{ tool.name }}\nDescription: {{ tool.description }}\nInput Schema: {{ tool.parameters }}\n{%endfor%}."
+  
+  openai:
+    prompt: "You are an intelligent AI bot capable of performing my commands on basis of tools provided to you further down.\n\nIn the following section, I will enumerate the tools you are permitted to use in attempt to carry out my requests.\n\n{%for tool in available_tools%}\nName : {{ tool.name }}\nDescription: {{ tool.description }}\nInput Schema: {{ tool.parameters }}\n{%endfor%}."
+
+  gemini:
+    prompt: "You are an AI bot capable of executing my commands on basis of tools provided to you further down.\n\nIn the following section, I will enumerate the tools you are permitted to use in attempt to carry out my requests.\n\n{%for tool in available_tools%}\nName : {{ tool.name }}\nDescription: {{ tool.description }}\nInput Schema: {{ tool.parameters }}\n{%endfor%}."

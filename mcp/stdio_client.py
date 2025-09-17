@@ -23,6 +23,7 @@
 
 import os
 import sys
+import yaml
 import asyncio
 
 from dotenv import load_dotenv
@@ -34,6 +35,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from typing import List, Dict
+from jinja2 import Template
 
 _ = load_dotenv()
 
@@ -53,33 +55,74 @@ class StdioClient:
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.model_client = setup_client(base_url, api_key)
+        self.system = self.setup_system()
 
     async def connect_to_server(self, cmd: str, args: List[str], env: Dict[str, str]) -> None:
         """
         Connect to MCP Server for Slack communication running on Standard I/O Transport.
         """
 
-        print(env)
         server_params = StdioServerParameters(command=cmd, args=args, env=env)
 
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        stdio_transport = await self.exit_stack.enter_async_context(
+            stdio_client(server_params)
+        )
+
         self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
+
+        self.session = await self.exit_stack.enter_async_context(
+            ClientSession(self.stdio, self.write)
+        )
 
         await self.session.initialize()
         response = await self.session.list_tools()
         tools = response.tools
-
         print(f"Oldson tools: {[tool.name for tool in tools]}")
 
+        self.available_tools = [{
+            "name": tool.name, 
+            "description": tool.description, 
+            "parameters": tool.inputSchema
+        } for tool in tools]
+
+        self.system = Template(self.system).render({"tools": self.available_tools})
+
     async def process_query(self, query: str) -> str:
-        raise NotImplementedError()
+        messages = [
+            { "role": "system", "content": self.system },
+            { "role": "user", "content": query }
+        ]
+
+        response = await generate_message(self.model_client, "egune", messages, None)
+
+        return response
     
-    async def interaction_loop(self) -> None:
-        raise NotImplementedError()
-    
+    async def initiate_cycle(self) -> None:
+        """Start the interaction cycle between a user and the MCP client."""
+
+        while True:
+            try:
+                query = input("(ctrl+c/quit)>>>").strip()
+
+                if query.lower().strip() == "quit":
+                    print(f"Quitting the interaction cycle...")
+                    sys.exit(0)
+
+                response = await self.process_query(query)
+                print(f"Response: {response}\n")
+            
+            except Exception as e:
+                print(f"Exception in the midst of interaction.\n{str(e)}")
+        
+
     async def cleanup(self) -> None:
         await self.exit_stack.aclose()
+
+    def setup_system(self) -> str:
+        with open("config/system.yaml", 'r', encoding="utf-8") as f:
+            system = yaml.safe_load(f)
+
+        return system["models"]["egune"]["prompt"]
     
 async def main():
 
@@ -95,6 +138,7 @@ async def main():
         }
 
         await client.connect_to_server(cmd, args, env)
+        await client.initiate_cycle()
 
     except Exception as e:
         print(f"ERROR: {str(e)}")
