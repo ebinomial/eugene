@@ -93,49 +93,43 @@ class StdioClient:
 
         self.system = Template(self.system).render({"tools": self.available_tools})
 
-    async def handle_request(self, query: str) -> str:
+    async def handle_request(self, context: List[Dict[str, str]]) -> None:
         """Handles the user request as a whole. If the query requests a simple response 
         it returns the model output in plain text. In event of multi-step reasoning and tool use,
         it acts as a ReAct agent that reasons over the current observations from the tools and decide
         to return the final answer or proceed differently.
         Args:
-            query (str): User query currently in absence of context
-
-        Returns:
-            str: model response or the final answer formulated through ReAct reasoning.
+            context (List[Dict[str, str]]): User query currently in absence of context
         """
 
-        messages = [
-            { "role": "system", "content": self.system },
-            { "role": "user", "content": query }
-        ]
+        is_process = True
 
-        response = await generate_message(self.model_client, "egune", messages)
-
-
-        if (match := re.search(r"```json\s*(.*?)\s*```", response)) is not None:
-            tool_call = match.group(1)
+        while is_process:
+            raw_response_output = await generate_message(self.model_client, "egune", context)
+            
             try:
-                invocation_request = json.loads(tool_call)
+                model_response = json.loads(raw_response_output)
+                if model_response["final"] == 0:
+                    if "tool" in model_response:
+                        tool_name = model_response["tool"]["name"]
+                        tool_args = model_response["tool"]["args"]
 
-                if ("name" in invocation_request) and ("args" in invocation_request):
-                    
-                    tool_response = await self.session.call_tool(
-                        invocation_request["name"], 
-                        invocation_request["args"]
-                    )
+                        tool_response = await self.session.call_tool(tool_name, tool_args)
+                        tool_response_repr = tool_response.model_dump_json()
 
-                    print(f"Tool response: {tool_response}")
+                        context.append({"role": "user", 
+                                        "content": f"TOOL RESPONSE from `{tool_name}`:\n{tool_response_repr}"})
 
-                else:
-                    print(f"tool invocation request generated/parsed incorrectly: {tool_call}")
+                elif model_response["final"] == 1:
+                    print(f"FINAL:\n{model_response}")
+                    is_process = False
+                    return
 
-            except (ValueError, Exception) as e:
-                print(f"Error happened in parsing the invocation request..: {str(e)}")
-
-            sys.exit(0)
-
-        return response
+            except ValueError as e:
+                print(f"Parsing error: {str(e)}")
+                content = f"I made the JSON error that cannot be parsed in my last response. I need to regenerate the following correctly:\n{model_response}"
+                context.append({"role": "assistant", "content": content})
+                # TODO: Have the LLM generate again
     
     async def initiate_cycle(self) -> None:
         """
@@ -153,7 +147,13 @@ class StdioClient:
                     print(f"Quitting the interaction cycle...")
                     sys.exit(0)
 
-                response = await self.handle_request(query)
+
+                context = [
+                    { "role" : "system" , "content" : self.system },
+                    { "role" : "user", "content": query }
+                ]
+
+                response = await self.handle_request(context)
                 print(f"Response: {response}\n")
             
             except Exception as e:
@@ -164,10 +164,10 @@ class StdioClient:
         await self.exit_stack.aclose()
 
     def setup_system(self) -> str:
-        with open("config/system.yaml", 'r', encoding="utf-8") as f:
-            system = yaml.safe_load(f)
+        with open("config/system.txt", 'r', encoding="utf-8") as f:
+            system = f.read()
 
-        return system["models"]["egune"]["prompt"]
+        return system
     
 async def main():
 

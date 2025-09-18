@@ -61,7 +61,7 @@ def setup_client(base_url: str, api_key: str = '') -> ModelClient | None:
 
 # Enenees gaduur yur ni ymr neg generation horiotoi kk.
 async def generate_message(client: ModelClient, model: str, 
-                           context: List[Dict[str, str]]) -> List[Dict[str, str]]:
+                           context: List[Dict[str, str]]) -> str:
     """
     Generates a query in the context of the interaction history from the stated model.
     Args:
@@ -70,14 +70,14 @@ async def generate_message(client: ModelClient, model: str,
         context (List[Dict[str, str]]): list of interactive roles and corresponding content text messages
     
     Returns:
-        List[Dict[str, str]]: context affixed with the user query as well as the model response
+        str: Model response either the final output or a tool call.
     """
 
     stream = await client.chat.completions.create(
         messages=context, 
         model=model, 
         stream=True, 
-        temperature=0.4
+        temperature=0.12
     )
 
     full_response = str()
