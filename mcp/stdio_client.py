@@ -106,7 +106,7 @@ class StdioClient:
 
         while is_process:
             raw_response_output = await generate_message(self.model_client, "chatgpt-4o-latest", context)
-            
+             
             try:
                 model_response = json.loads(raw_response_output)
 

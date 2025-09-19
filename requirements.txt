@@ -1,3 +1,4 @@
 openai
 dotenv
 mcp
+langchain-mcp-adapters
