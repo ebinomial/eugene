@@ -80,11 +80,38 @@ class StdioMultiClient:
 
         is_process = True
         while is_process:
+            
             raw_response_output = await generate_message(
                 self.model_client,
                 model="chatgpt-4o-latest",
-                
+                context=context
             )
+
+            try:
+                model_response = json.loads(raw_response_output)
+
+                if model_response["decision"] == "tool":
+                    if "tool" in model_response:
+                        tool_name = model_response["tool"]["name"]
+                        tool_args = model_response["tool"]["args"]
+
+                        # Find and invoke the tool (works across all servers)
+                        tool = next((t for t in self.available_tools if t.name == tool_name), None)
+                        if tool:
+                            tool_response = await tool.ainvoke(tool_args)
+                            context.append({"role": "assistant", 
+                                          "content": f"TOOL RESPONSE SAYS:\n{tool_response}"})
+                        else:
+                            context.append({"role": "assistant", 
+                                          "content": f"Tool {tool_name} not found"})
+                else:
+                    print(f"FINAL:\n{model_response}")
+                    is_process = False
+                    return
+
+            except ValueError as e:
+                print(f"Parsing error: {str(e)}")
+                is_process=False
 
     async def initiate_cycle(self) -> None:
         """
@@ -123,3 +150,32 @@ class StdioMultiClient:
             system = f.read()
 
         return system
+    
+
+async def main():
+
+    client = StdioMultiClient()
+
+    try:
+        configs = {
+            "slack": {
+                "command": "npx",
+                "args": ["-y" , "@modelcontextprotocol/server-slack"],
+                "transport": "stdio",
+                "env": {
+                    "SLACK_BOT_TOKEN": os.getenv("SLACK_BOT_TOKEN"),
+                    "SLACK_TEAM_ID": os.getenv("SLACK_TEAM_ID"),
+                    "SLACK_CHANNEL_IDS": os.getenv("SLACK_CHANNEL_IDS")
+                }
+            }
+        }
+
+        await client.connect_to_servers(configs)
+        await client.initiate_cycle()
+
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
