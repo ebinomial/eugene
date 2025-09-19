@@ -42,7 +42,7 @@ from jinja2 import Template
 _ = load_dotenv()
 
 base_url = os.getenv("BASE_URL")
-api_key = os.getenv("API_KEY")
+api_key = os.getenv("OPENAI_API_KEY")
 
 from src.models import setup_client, generate_message
 
@@ -88,7 +88,7 @@ class StdioClient:
         self.available_tools = [{
             "name": tool.name, 
             "description": tool.description, 
-            "parameters": tool.inputSchema
+            "inputSchema": tool.inputSchema
         } for tool in tools]
 
         self.system = Template(self.system).render({"tools": self.available_tools})
@@ -105,22 +105,22 @@ class StdioClient:
         is_process = True
 
         while is_process:
-            raw_response_output = await generate_message(self.model_client, "egune", context)
+            raw_response_output = await generate_message(self.model_client, "chatgpt-4o-latest", context)
             
             try:
                 model_response = json.loads(raw_response_output)
-                if model_response["final"] == 0:
+
+                if model_response["decision"] == "tool":
                     if "tool" in model_response:
                         tool_name = model_response["tool"]["name"]
                         tool_args = model_response["tool"]["args"]
 
                         tool_response = await self.session.call_tool(tool_name, tool_args)
                         tool_response_repr = tool_response.model_dump_json()
+                        context.append({"role": "assistant", 
+                                        "content": f"TOOL RESPONSE SAYS:\n{tool_response_repr}"})
 
-                        context.append({"role": "user", 
-                                        "content": f"TOOL RESPONSE from `{tool_name}`:\n{tool_response_repr}"})
-
-                elif model_response["final"] == 1:
+                else:
                     print(f"FINAL:\n{model_response}")
                     is_process = False
                     return

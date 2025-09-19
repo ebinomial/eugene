@@ -50,7 +50,7 @@ def setup_client(base_url: str, api_key: str = '') -> ModelClient | None:
     try:
         
         # TODO: check the type of client to spawn
-        client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+        client = AsyncOpenAI(api_key=api_key)
 
         logger.info(f"Client amjilttai uussen shu!")
         return client
@@ -77,12 +77,11 @@ async def generate_message(client: ModelClient, model: str,
         messages=context, 
         model=model, 
         stream=True, 
-        temperature=0.12
     )
 
     full_response = str()
     
-    print(f">>>{model.upper()}: ", end="")
+    print(f">>>BOT: ", end="")
     async for token in stream:
         if token.choices[0].delta.content:
             print(token.choices[0].delta.content, end="")
