@@ -33,7 +33,7 @@ from dotenv import load_dotenv
 from typing import Optional
 from contextlib import AsyncExitStack
 
-from mcp import ClientSession, StdioServerParameters
+from mcp_client import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from typing import List, Dict

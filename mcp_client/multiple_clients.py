@@ -28,27 +28,17 @@ import yaml
 import json
 import asyncio
 
-from dotenv import load_dotenv
-
 from typing import Optional
-from contextlib import AsyncExitStack
-
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 
 from typing import List, Optional, Dict
 from jinja2 import Template
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from src.models import setup_client, generate_message
-_ = load_dotenv()
-
-base_url = os.getenv("BASE_URL")
-api_key = os.getenv("OPENAI_API_KEY")
 
 class StdioMultiClient:
 
-    def __init__(self) -> None:
+    def __init__(self, base_url: str, api_key: str) -> None:
         self.client: Optional[MultiServerMCPClient] = None
         self.model_client = setup_client(base_url, api_key)
         self.system = self.setup_system()
@@ -141,41 +131,9 @@ class StdioMultiClient:
             except Exception as e:
                 print(f"Exception in the midst of interaction.\n{str(e)}")
         
-
-    async def cleanup(self) -> None:
-        await self.exit_stack.aclose()
-
     def setup_system(self) -> str:
         with open("config/system.txt", 'r', encoding="utf-8") as f:
             system = f.read()
 
         return system
     
-
-async def main():
-
-    client = StdioMultiClient()
-
-    try:
-        configs = {
-            "slack": {
-                "command": "npx",
-                "args": ["-y" , "@modelcontextprotocol/server-slack"],
-                "transport": "stdio",
-                "env": {
-                    "SLACK_BOT_TOKEN": os.getenv("SLACK_BOT_TOKEN"),
-                    "SLACK_TEAM_ID": os.getenv("SLACK_TEAM_ID"),
-                    "SLACK_CHANNEL_IDS": os.getenv("SLACK_CHANNEL_IDS")
-                }
-            }
-        }
-
-        await client.connect_to_servers(configs)
-        await client.initiate_cycle()
-
-    except Exception as e:
-        print(f"ERROR: {str(e)}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
