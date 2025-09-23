@@ -21,12 +21,8 @@
 # SOFTWARE.
 
 
-import os
-import re
 import sys
-import yaml
 import json
-import asyncio
 
 from typing import Optional
 
@@ -89,6 +85,7 @@ class StdioMultiClient:
                         tool = next((t for t in self.available_tools if t.name == tool_name), None)
                         if tool:
                             tool_response = await tool.ainvoke(tool_args)
+                            print(f"TOOL RESPONSE:\n{tool_response}")
                             context.append({"role": "assistant", 
                                           "content": f"TOOL RESPONSE SAYS:\n{tool_response}"})
                         else:
@@ -101,6 +98,10 @@ class StdioMultiClient:
 
             except ValueError as e:
                 print(f"Parsing error: {str(e)}")
+                is_process=False
+
+            except Exception as e:
+                print(f"Unexpected exception took place: {e}")
                 is_process=False
 
     async def initiate_cycle(self) -> None:
@@ -129,7 +130,7 @@ class StdioMultiClient:
                 print(f"Response: {response}\n")
             
             except Exception as e:
-                print(f"Exception in the midst of interaction.\n{str(e)}")
+                print(f"Exception in the midst of interaction. {e}")
         
     def setup_system(self) -> str:
         with open("config/system.txt", 'r', encoding="utf-8") as f:

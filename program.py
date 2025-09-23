@@ -1,6 +1,10 @@
 import asyncio
 
 import os
+import sys
+
+sys.path.append('/home/verdine/Projects/eugene/')
+
 from dotenv import load_dotenv
 from mcp_client.multiple_clients import StdioMultiClient
 
@@ -8,7 +12,6 @@ load_dotenv()
 
 base_url = os.getenv("BASE_URL")
 api_key = os.getenv("OPENAI_API_KEY")
-exa_api_key = os.getenv("EXA_API_KEY")
 
 async def main():
 
@@ -26,16 +29,19 @@ async def main():
                     "SLACK_CHANNEL_IDS": os.getenv("SLACK_CHANNEL_IDS")
                 }
             },
-            "exa": {
-                "command": "npx",
+            "google_search": {
+                "command": "node",
                 "transport": "stdio",
                 "args": [
-                    "-y",
-                    "mcp-remote",
-                    f"https://mcp.exa.ai/mcp?exaApiKey={exa_api_key}"
-                ]
+                    "/home/verdine/Projects/Google-Search-MCP-Server/dist/google-search.js"
+                ],
+                "env": {
+                    "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY"),
+                    "GOOGLE_SEARCH_ENGINE_ID": os.getenv("GOOGLE_SEARCH_ENGINE_ID")
+                }
             }
         }
+
 
         await client.connect_to_servers(configs)
         await client.initiate_cycle()

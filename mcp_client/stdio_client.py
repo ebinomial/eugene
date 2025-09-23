@@ -33,7 +33,7 @@ from dotenv import load_dotenv
 from typing import Optional
 from contextlib import AsyncExitStack
 
-from mcp_client import ClientSession, StdioServerParameters
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from typing import List, Dict
@@ -83,7 +83,6 @@ class StdioClient:
         await self.session.initialize()
         response = await self.session.list_tools()
         tools = response.tools
-        print(f"Oldson tools: {[tool.name for tool in tools]}")
 
         self.available_tools = [{
             "name": tool.name, 
